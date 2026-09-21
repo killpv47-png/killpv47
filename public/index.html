@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FlyTrader — a real fruit-fly connectome trading Bitcoin</title>
+<meta name="description" content="139,255-neuron FlyWire connectome (whole-brain LIF) watching live BTC and paper-trading on FlyBay with mushroom-body dopamine learning.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪰</text></svg>">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="boot" class="boot"><div class="boot-inner"><div class="boot-fly">🪰</div><div class="boot-title">FlyTrader</div><div class="boot-sub" id="boot-msg">Loading 139,255 neurons…</div><div class="boot-bar"><i id="boot-bar"></i></div></div></div>
+
+<header id="topbar">
+  <div class="brand"><span class="logo">🪰</span><div><b>FlyTrader</b><small>FlyWire v783 · whole-brain LIF · FlyBay paper exchange</small></div></div>
+  <div class="ticker" id="ticker"><span class="pair">BTC-USD</span><span class="price" id="price">—</span><span class="chg" id="chg"></span><span class="src" id="src"></span></div>
+  <div class="controls">
+    <button id="btn-start" class="btn primary"><i class="fa fa-play"></i><span>Start</span></button>
+    <button id="btn-stop" class="btn"><i class="fa fa-pause"></i><span>Pause</span></button>
+    <button id="btn-step" class="btn ghost" title="Run one decision now"><i class="fa fa-forward-step"></i><span>Step</span></button>
+    <button id="btn-reset-brain" class="btn danger" title="Restore every learned synapse to the measured connectome"><i class="fa fa-brain"></i><span>Reset brain</span></button>
+    <button id="btn-reset-acc" class="btn warn" title="Fresh $1,000 FlyBay account"><i class="fa fa-wallet"></i><span>Reset $1000</span></button>
+    <span class="status-pill" id="status-pill"><i></i><span>connecting</span></span>
+  </div>
+</header>
+
+<nav id="mobile-tabs">
+  <button data-tab="brain" class="active"><i class="fa fa-brain"></i>Brain</button>
+  <button data-tab="room"><i class="fa fa-desktop"></i>Room</button>
+  <button data-tab="exchange"><i class="fa fa-chart-line"></i>FlyBay</button>
+  <button data-tab="logs"><i class="fa fa-terminal"></i>Logs</button>
+</nav>
+
+<main id="layout">
+  <!-- ===== LEFT: 3D BRAIN ===== -->
+  <section id="panel-brain" class="panel view" data-tab="brain">
+    <canvas id="brain-canvas"></canvas>
+    <div class="overlay top-left">
+      <h2><i class="fa fa-brain"></i> Connectome <span class="tag">139,255 neurons · 2.7M connections</span></h2>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="overlay bottom-left brain-stats">
+      <div><small>active / decision</small><b id="s-active">—</b></div>
+      <div><small>total spikes</small><b id="s-spikes">—</b></div>
+      <div><small>sim time</small><b id="s-simms">—</b></div>
+      <div><small>learned synapses</small><b id="s-plast">—</b></div>
+    </div>
+    <div class="overlay bottom-right stim">
+      <small>optogenetic stimulation</small>
+      <button data-stim="PAM" title="Reward dopamine">PAM 🍬</button>
+      <button data-stim="PPL1" title="Punishment dopamine">PPL1 ⚡</button>
+      <button data-stim="LC4" title="Looming threat">LC4 👁</button>
+      <button data-stim="sugar">sugar</button>
+      <button data-stim="bitter">bitter</button>
+    </div>
+    <div class="overlay top-right mb">
+      <small>mushroom body read-out</small>
+      <div class="mbon-bar"><span class="lab">APPROACH</span><div class="bar"><i id="mb-app"></i></div><b id="mb-app-v">0</b></div>
+      <div class="mbon-bar"><span class="lab">AVOID</span><div class="bar red"><i id="mb-av"></i></div><b id="mb-av-v">0</b></div>
+      <div class="bias"><span>bias</span><div class="bias-track"><i id="bias-dot"></i></div><b id="bias-v">0.00</b></div>
+      <div class="decision" id="decision">HOLD</div>
+    </div>
+  </section>
+
+  <!-- ===== CENTER: 3D ROOM ===== -->
+  <section id="panel-room" class="panel view" data-tab="room">
+    <canvas id="room-canvas"></canvas>
+    <div class="overlay top-left"><h2><i class="fa fa-house"></i> The fly's office <span class="tag" id="body-state">idle</span></h2></div>
+    <div class="overlay bottom-left cam">
+      <button data-cam="desk"><i class="fa fa-desktop"></i> desk</button>
+      <button data-cam="fly"><i class="fa fa-bug"></i> fly</button>
+      <button data-cam="screen"><i class="fa fa-display"></i> screen</button>
+      <button data-cam="room"><i class="fa fa-house"></i> room</button>
+    </div>
+    <div class="overlay bottom-right dn">
+      <small>descending neurons → body</small>
+      <div class="dn-row"><span>DNp09 walk</span><i id="dn-walk"></i></div>
+      <div class="dn-row"><span>DNa01/02 steer</span><i id="dn-turn"></i></div>
+      <div class="dn-row"><span>DNg11 groom</span><i id="dn-groom"></i></div>
+      <div class="dn-row"><span>DNp01 escape</span><i id="dn-escape"></i></div>
+    </div>
+  </section>
+
+  <!-- ===== RIGHT: EXCHANGE + LOGS ===== -->
+  <aside id="panel-side">
+    <section id="panel-exchange" class="panel card view" data-tab="exchange">
+      <div class="card-head"><h2><i class="fa fa-chart-line"></i> FlyBay <span class="tag">paper · live BTC-USD</span></h2><span class="mini" id="acct-id">acct FB-000001</span></div>
+      <div class="equity-row"><div><small>Equity</small><b id="w-equity">$1,000.00</b><span id="w-ret" class="ret">+0.00%</span></div><canvas id="equity-spark" width="300" height="56"></canvas></div>
+      <div class="wallet-grid">
+        <div><small>USD</small><b id="w-usd">—</b></div><div><small>BTC</small><b id="w-btc">—</b></div>
+        <div><small>Unrealised</small><b id="w-upnl">—</b></div><div><small>Realised</small><b id="w-rpnl">—</b></div>
+        <div><small>Fees paid</small><b id="w-fees">—</b></div><div><small>Tax reserve</small><b id="w-tax">—</b></div>
+        <div><small>Withdrawn</small><b id="w-wd">—</b></div><div><small>Tax paid</small><b id="w-taxp">—</b></div>
+        <div><small>Win rate</small><b id="w-wr">—</b></div><div><small>Max drawdown</small><b id="w-dd">—</b></div>
+        <div><small>Decisions</small><b id="w-dec">—</b></div><div><small>Avg reward</small><b id="w-rew">—</b></div>
+      </div>
+      <canvas id="chart" class="chart"></canvas>
+      <div class="odours"><small>market odours → glomeruli</small><div id="odours"></div></div>
+      <div class="tabs2"><button class="active" data-t2="trades">Trades</button><button data-t2="ledger">Ledger</button><button data-t2="decisions">Decisions</button>
+        <span class="spacer"></span><button class="mini-btn" id="btn-withdraw"><i class="fa fa-building-columns"></i> Withdraw</button><button class="mini-btn" id="btn-tax"><i class="fa fa-file-invoice-dollar"></i> Settle tax</button></div>
+      <div class="table-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+    </section>
+    <section id="panel-logs" class="panel card view" data-tab="logs">
+      <div class="card-head"><h2><i class="fa fa-terminal"></i> Neural & trade log</h2><label class="mini"><input type="checkbox" id="log-debug" checked> holds</label></div>
+      <div id="log"></div>
+    </section>
+  </aside>
+</main>
+
+<footer id="foot">FlyWire FAFB v783 (Dorkenwald et al. 2024; Schlegel et al. 2024, CC BY-NC 4.0) · LIF model after Shiu et al. 2024 · KC→MBON dopamine plasticity · Paper trading only — no real money · <a href="https://github.com/cobanov/awesome-fly" target="_blank">awesome-fly</a></footer>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

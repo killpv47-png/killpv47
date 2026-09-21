@@ -1,0 +1,101 @@
+name: FlyTrader — build, test & live session
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "How long to keep the fly trading in this run (max ~350)"
+        default: "30"
+        required: true
+
+jobs:
+  test:
+    name: Build connectome & smoke-test the brain
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Cache FlyWire v783 binaries
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/brain/*.bin
+            public/data/brain_points.bin
+          key: flywire-783-${{ hashFiles('scripts/prepare_data.py') }}
+      - name: Install deps
+        run: |
+          npm ci
+          pip install numpy pandas
+      - name: Prepare FlyWire connectome (139,255 neurons)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python3 scripts/prepare_data.py /tmp/flywire
+      - name: Brain smoke test (LIF + mushroom-body plasticity)
+        run: node scripts/selftest.mjs
+      - name: Server smoke test (API + live BTC feed)
+        run: |
+          PORT=3000 node server/index.mjs & sleep 8
+          curl -sf localhost:3000/api/status | head -c 400; echo
+          curl -sf -X POST localhost:3000/api/control/step -H 'content-type: application/json' -d '{}' >/dev/null
+          curl -sf localhost:3000/api/decisions?n=1
+          kill %1
+
+  live-session:
+    name: Live fly-trading session behind a Cloudflare quick tunnel
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            data/brain/*.bin
+            public/data/brain_points.bin
+          key: flywire-783-${{ hashFiles('scripts/prepare_data.py') }}
+      - name: Install
+        run: |
+          npm ci && pip install numpy pandas
+          [ -f data/brain/csr_w.bin ] || python3 scripts/prepare_data.py /tmp/flywire
+          curl -sL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+      - name: Restore previous brain & account (artifact)
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: flytrader-db, path: data }
+      - name: Start FlyTrader + tunnel
+        run: |
+          PORT=3000 nohup node server/index.mjs > server.log 2>&1 &
+          sleep 8
+          nohup cloudflared tunnel --url http://localhost:3000 --no-autoupdate > tunnel.log 2>&1 &
+          for i in $(seq 1 40); do URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' tunnel.log | tail -1); [ -n "$URL" ] && break; sleep 1; done
+          echo "### 🪰 FlyTrader is live: $URL" >> $GITHUB_STEP_SUMMARY
+          echo "Open it in a browser (desktop or phone). The session ends after ${{ github.event.inputs.minutes }} minutes." >> $GITHUB_STEP_SUMMARY
+          curl -sf -X POST localhost:3000/api/control/start -H 'content-type: application/json' -d '{}' >/dev/null
+          echo "URL=$URL"
+      - name: Trade for the requested time
+        run: |
+          M=${{ github.event.inputs.minutes }}; [ "$M" -gt 350 ] && M=350
+          for i in $(seq 1 $M); do sleep 60; curl -sf localhost:3000/api/status | python3 -c "import json,sys; d=json.load(sys.stdin); w=d['wallet']; print(f\"[{i}m] BTC \${w['price']:.0f} equity \${w['equity']:.2f} ({w['returnPct']:+.2f}%) trades {w['tradesCount']} decisions {d['decisionCount']}\")" || true; done
+      - name: Session summary
+        if: always()
+        run: |
+          curl -sf localhost:3000/api/status | python3 -c "import json,sys; d=json.load(sys.stdin); w=d['wallet']; b=d['brain']; print(f\"## Session result\n- Equity: \${w['equity']:.2f} ({w['returnPct']:+.2f}%)\n- Trades: {w['tradesCount']} (win rate {w['winRate']}%)\n- Fees: \${w['feesPaid']:.2f} · tax reserve \${w['taxReserve']:.2f} · withdrawn \${w['withdrawn']:.2f}\n- Decisions: {d['decisionCount']} · spikes {b['totalSpikes']:,}\n- Learned synapses: {b['plasticity']['depressed']:,}/{b['plasticity']['synapses']:,} ({b['plasticity']['deviation']*100:.1f}% deviation from measured connectome)\")" >> $GITHUB_STEP_SUMMARY || true
+          tail -40 server.log
+      - name: Save brain & account for the next run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flytrader-db
+          path: data/flytrader.db*
+          retention-days: 30
